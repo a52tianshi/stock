@@ -22,7 +22,7 @@ func main() {
 	var a int
 	glog.Infoln(datadir)
 	filepath.Walk(datadir+"/raw1/", func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() == false && info.Size() < 1000 {
+		if info.IsDir() == false && info.Size() < 100 {
 			os.Remove(path)
 			a++
 		}
