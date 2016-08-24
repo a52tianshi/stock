@@ -13,7 +13,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var timestart time.Time = time.Date(2016, time.August, 1, 0, 0, 0, 0, time.Local) ///////////////重要
+var timestart time.Time = time.Date(2016, time.January, 1, 0, 0, 0, 0, time.Local) ///////////////重要
 
 const base_url = "http://market.finance.sina.com.cn/downxls.php?date=2016-08-19&symbol=sz002223"
 const base_url1 = "http://market.finance.sina.com.cn/downxls.php?date="
@@ -51,6 +51,9 @@ func main() {
 	glog.Infoln("下载")
 	var requestnumber int
 	for date := time.Now().Add(-time.Second * 86400 * 0); date.After(timestart); date = date.Add(-time.Second * 86400) {
+		if date.Weekday() == time.Sunday || date.Weekday() == time.Saturday {
+			continue
+		}
 		dd := date.Format("2006-01-02")
 		for _, code := range codelist {
 			requestnumber++
