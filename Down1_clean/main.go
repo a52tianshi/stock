@@ -44,7 +44,7 @@ func main() {
 				//f.Close()
 			}
 			glog.Infoln(path)
-			//os.Remove(path)
+			os.Remove(path)
 			a++
 		}
 		return nil
