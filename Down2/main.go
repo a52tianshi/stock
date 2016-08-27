@@ -13,7 +13,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var timestart int = -1 + 4*2016 + 2
+var timestart int = -1 + 4*2015 + 1
 var timeend int = -1 + 4*2016 + 3
 
 const base_url = "http://vip.stock.finance.sina.com.cn/corp/go.php/vMS_FuQuanMarketHistory/stockid/002223.phtml?year=2016&jidu=3"
@@ -27,7 +27,7 @@ var subdir string = "/raw2/"
 
 func main() {
 	channel = make(chan string, 10000)
-	work = make(chan int, 300)
+	work = make(chan int, 100)
 	fmt.Println("")
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -56,7 +56,11 @@ func main() {
 		for _, code := range codelist {
 			requestnumber++
 			time.Sleep(time.Second * 0)
-			go DownRecoveryFactor(code, dd)
+			if date == timeend {
+				go DownRecoveryFactor(code, dd, true)
+			} else {
+				go DownRecoveryFactor(code, dd, false)
+			}
 		}
 	}
 	//var requestnumber int = len(codelist) * (int(time.Now().Unix()-timestart.Unix()) / 86400) //总计请求数目
@@ -71,28 +75,48 @@ func main() {
 		}
 	}
 }
-func DownRecoveryFactor(code string, date string) {
-	regdate := regexp.MustCompile("")
+func DownRecoveryFactor(code string, date string, cover bool) {
+	regdate := regexp.MustCompile("&date=([-0-9]{10,10})'>")
+	regvalue := regexp.MustCompile("<td class=\"tdr\"><div align=\"center\">([0-9\\.]+)</div></td>\\s+ </tr>")
+
 	//fmt.Println(1)
-	if Exist(datadir + subdir + code + "/" + date) {
+	if Exist(datadir+subdir+code+"/"+date) && cover == false {
+		//glog.Infoln("pass")
 		channel <- "1"
 		return
 	}
 	work <- 1
-	glog.Infoln(base_url1 + code[2:] + base_url2 + date)
+	//glog.Infoln(base_url1 + code[2:] + base_url2 + date)
 	if resp, err := http.Get(base_url1 + code[2:] + base_url2 + date); err == nil {
-		glog.Infoln(base_url1 + code[2:] + base_url2 + date)
+		//glog.Infoln(base_url1 + code[2:] + base_url2 + date)
 		buf, err2 := ioutil.ReadAll(resp.Body)
-		if len(buf) > 100 && err2 == nil {
+		if len(buf) > 100 && err2 == nil && resp.StatusCode == http.StatusOK {
 			os.Remove(datadir + subdir + code + "/" + date)
 			f, _ := os.Create(datadir + subdir + code + "/" + date)
-			f.Write(buf)
+			v_date := regvalue.FindAllStringSubmatch(string(buf), -1)
+			v_factor := regdate.FindAllStringSubmatch(string(buf), -1)
+			//glog.Warningln(len(v_factor))
+			for i := 0; i < len(v_factor); i++ {
+				f.Write([]byte(v_factor[i][1]))
+				f.Write([]byte(","))
+				f.Write([]byte(v_date[i][1]))
+				f.Write([]byte("\n"))
+			}
 			f.Close()
 			resp.Body.Close()
 		} else {
-
+			glog.Infoln(base_url1 + code[2:] + base_url2 + date)
+			glog.Infoln("c")
+			if cover == true {
+				panic("a")
+			}
 		}
 
+	} else {
+		glog.Infoln("d")
+		if cover == true {
+			panic("b")
+		}
 	}
 	channel <- "1"
 	<-work

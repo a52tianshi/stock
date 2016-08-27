@@ -9,11 +9,12 @@ import (
 	"regexp"
 	"time"
 	//	"strings"
+	"path/filepath"
 
 	"github.com/golang/glog"
 )
 
-var timestart time.Time = time.Date(2016, time.January, 1, 0, 0, 0, 0, time.Local) ///////////////重要
+//var timestart time.Time = time.Date(2016, time.January, 1, 0, 0, 0, 0, time.Local) ///////////////重要
 
 const base_url = "http://market.finance.sina.com.cn/downxls.php?date=2016-08-19&symbol=sz002223"
 const base_url1 = "http://market.finance.sina.com.cn/downxls.php?date="
@@ -31,7 +32,7 @@ func main() {
 	flag.Parse()
 	datadir = os.Getenv("STOCKDATA")
 	glog.Infoln(datadir)
-	glog.Infoln("开始时间", timestart)
+	//	glog.Infoln("开始时间", timestart)
 	//	channel = make(chan string, 1000)
 	//	work = make(chan int, 500)
 	glog.Infoln("开始")
@@ -50,19 +51,44 @@ func main() {
 	}
 	glog.Infoln("下载")
 	var requestnumber int
-	for date := time.Now().Add(-time.Second * 86400 * 0); date.After(timestart); date = date.Add(-time.Second * 86400) {
-		if date.Weekday() == time.Sunday || date.Weekday() == time.Saturday {
-			continue
+	var count int
+	//	for date := time.Now().Add(-time.Second * 86400 * 0); date.After(timestart); date = date.Add(-time.Second * 86400) {
+	//		if date.Weekday() == time.Sunday || date.Weekday() == time.Saturday {
+	//			continue
+	//		}
+	//		dd := date.Format("2006-01-02")
+	//		for _, code := range codelist {
+	//			requestnumber++
+	//			time.Sleep(time.Second * 0)
+	//			go DownStock(code, dd)
+	//		}
+	//	}
+	codereg := regexp.MustCompile("s[hz][0-9]{6,6}")
+	datereg := regexp.MustCompile("[-0-9]{10,10}")
+	filepath.Walk(datadir+"/raw2/", func(path string, info os.FileInfo, err error) error {
+		if info.Size() < 10 {
+			return nil
 		}
-		dd := date.Format("2006-01-02")
-		for _, code := range codelist {
+		ff, _ := os.Open(path)
+		str, _ := ioutil.ReadAll(ff)
+		codeone := codereg.FindString(string(path))
+		dates := datereg.FindAllString(string(str), -1)
+		for _, dd := range dates {
+			if Exist(datadir + "/raw1/" + codeone + "/" + dd) {
+				requestnumber++
+				count++
+				continue
+			}
 			requestnumber++
 			time.Sleep(time.Second * 0)
-			go DownStock(code, dd)
+			go DownStock(codeone, dd)
 		}
-	}
+
+		ff.Close()
+		return nil
+	})
 	//var requestnumber int = len(codelist) * (int(time.Now().Unix()-timestart.Unix()) / 86400) //总计请求数目
-	var count int
+
 	glog.Infoln(count, requestnumber)
 	for {
 		<-channel
@@ -81,8 +107,9 @@ func DownStock(code string, date string) {
 	work <- 1
 
 	if resp, err := http.Get(base_url1 + date + base_url2 + code); err == nil {
+		glog.Infoln(resp, err, base_url1+date+base_url2+code)
 		buf, err2 := ioutil.ReadAll(resp.Body)
-		if len(buf) > 100 && err2 == nil {
+		if len(buf) > 10 && err2 == nil && resp.StatusCode == http.StatusOK {
 			os.Remove(datadir + "/raw1/" + code + "/" + date)
 			f, _ := os.Create(datadir + "/raw1/" + code + "/" + date)
 			f.Write(buf)
